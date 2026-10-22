@@ -18,6 +18,22 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      - name: Install UWP workload for Visual Studio
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          Write-Host "Visual Studio at: $vs"
+          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+            "modify", "--installPath", "`"$vs`"",
+            "--add", "Microsoft.VisualStudio.Workload.Universal",
+            "--add", "Microsoft.VisualStudio.Component.Windows10SDK.19041",
+            "--includeRecommended", "--quiet", "--norestart", "--nocache"
+          )
+          Write-Host "Installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
+          Get-ChildItem "$vs\MSBuild\Microsoft\WindowsXaml" -ErrorAction SilentlyContinue
+
       - name: Create self-signed test certificate
         shell: pwsh
         run: |
