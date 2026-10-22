@@ -47,6 +47,12 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# UWP build output and local signing keys
+native/xbox-uwp-launcher/bin/
+native/xbox-uwp-launcher/obj/
+native/xbox-uwp-launcher/AppPackages/
+native/xbox-uwp-launcher/*.pfx
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 

@@ -9,17 +9,13 @@
 - يجب أن يوفّر التطبيق الهدف مخطط URI، وأن يسمح Xbox Dev Mode بتشغيله.
 - نجاح فتح URI لا يعني أن التطبيق الهدف متوافق مع Xbox.
 
-## البناء على Windows
+## بناء الحزمة السحابية
 
-هذه البيئة لا تحتوي على Windows SDK أو MSBuild، لذلك لا يمكنها إخراج APPX جاهز. لإنتاج الحزمة:
+المشروع يحتوي على سير عمل GitHub Actions يبني حزمة x64 موقّعة على خادم Windows عند تحديث ملفات التطبيق في `main`، أو عند تشغيل **Build Xbox UWP APPX** يدوياً من تبويب **Actions**. نزّل الناتج باسم `XboxUwpLauncher-Sideload` وفك ضغطه؛ يحتوي على APPX والشهادة وأي ملفات اعتماد أنتجها البناء.
 
-1. ثبّت Visual Studio على Windows مع **Universal Windows Platform development** وWindows 10 SDK.
-2. افتح `XboxUwpLauncher.sln`.
-3. اختر `x64` و`Release`، ثم نفّذ **Build > Build Solution**.
-4. أنشئ شهادة اختبار محلية من خصائص الحزمة/معالج **Create App Packages**، وتأكد أن اسم الناشر في الشهادة يطابق قيمة `Publisher` في `Package.appxmanifest`.
-5. أنشئ حزمة sideload، ثم ثبّتها على Xbox المفعّل فيه Developer Mode بالطريقة الرسمية المتاحة في بوابة Xbox Device Portal.
+بعد تفعيل Developer Mode وDevice Portal على Xbox، استخدم صفحة تثبيت التطبيقات في Device Portal لتحميل ملف APPX واعتماداته. لا ترفع ملف الشهادة الخاصة؛ الحزمة المرفقة تحتوي فقط على شهادة عامة لازمة للتحقق من التوقيع.
 
-قد تختلف أسماء خيارات الحزم حسب إصدار Visual Studio وWindows SDK. الحزمة تحتاج توقيعاً موثوقاً/شهادة تطوير مناسبة قبل تثبيتها.
+للبناء محلياً بدلاً من ذلك، يلزم Windows مع Visual Studio 2022 و**Universal Windows Platform tools** وWindows SDK 10.0.19041.0 أو أحدث.
 
 ## إدخال رابط
 
