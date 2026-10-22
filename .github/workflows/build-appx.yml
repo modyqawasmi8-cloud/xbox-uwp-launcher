@@ -22,7 +22,6 @@ jobs:
         shell: pwsh
         run: |
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-          Write-Host "Visual Studio at: $vs"
           $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
           $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
             "modify", "--installPath", "`"$vs`"",
@@ -32,7 +31,6 @@ jobs:
           )
           Write-Host "Installer exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
-          Get-ChildItem "$vs\MSBuild\Microsoft\WindowsXaml" -ErrorAction SilentlyContinue
 
       - name: Create self-signed test certificate
         shell: pwsh
@@ -50,6 +48,7 @@ jobs:
       - name: Build and package (APPX, x64, Release)
         shell: pwsh
         run: |
+          $errLog = "$env:GITHUB_WORKSPACE\build-errors.log"
           msbuild "$env:PROJECT_DIR\XboxUwpLauncher.sln" /restore `
             /p:Configuration=Release /p:Platform=x64 `
             /p:AppxBundle=Never `
@@ -57,7 +56,19 @@ jobs:
             /p:AppxPackageSigningEnabled=true `
             /p:PackageCertificateKeyFile="$env:RUNNER_TEMP\dev.pfx" `
             /p:PackageCertificatePassword="$env:CERT_PASSWORD" `
-            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\"
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" `
+            "/flp:logfile=$errLog;errorsonly"
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            if (Test-Path $errLog) {
+              Get-Content $errLog | Select-Object -Unique | Select-Object -First 8 | ForEach-Object {
+                $m = $_.Trim() -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+                if ($m.Length -gt 900) { $m = $m.Substring(0,900) }
+                Write-Host "::error title=MSBuild::$m"
+              }
+            }
+            exit $code
+          }
 
       - name: Collect output
         shell: pwsh
