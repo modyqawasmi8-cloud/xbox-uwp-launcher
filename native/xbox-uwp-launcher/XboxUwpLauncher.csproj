@@ -15,7 +15,7 @@
     <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
     <MinimumVisualStudioVersion>16</MinimumVisualStudioVersion>
     <TargetFramework>uap10.0.19041</TargetFramework>
-    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win10-x64;win10-x64-aot</RuntimeIdentifiers>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
     <AppxBundle>Never</AppxBundle>
