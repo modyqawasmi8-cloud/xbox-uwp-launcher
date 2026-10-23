@@ -48,6 +48,7 @@ testem.log
 Thumbs.db
 
 # UWP build output and local signing keys
+/AppPackages/
 native/xbox-uwp-launcher/bin/
 native/xbox-uwp-launcher/obj/
 native/xbox-uwp-launcher/AppPackages/

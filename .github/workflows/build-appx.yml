@@ -12,7 +12,6 @@ jobs:
     runs-on: windows-2022
     env:
       PROJECT_DIR: native/xbox-uwp-launcher
-      CERT_PASSWORD: xbox-dev-1234
     steps:
       - uses: actions/checkout@v4
 
@@ -21,40 +20,58 @@ jobs:
       - name: Install UWP workload for Visual Studio
         shell: pwsh
         run: |
-          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+          $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          $setup = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\setup.exe'
           $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
             "modify", "--installPath", "`"$vs`"",
-            "--add", "Microsoft.VisualStudio.Workload.Universal",
+            "--add", "Microsoft.VisualStudio.ComponentGroup.UWP.Support",
             "--add", "Microsoft.VisualStudio.Component.Windows10SDK.19041",
-            "--includeRecommended", "--quiet", "--norestart", "--nocache"
+            "--quiet", "--norestart", "--nocache"
           )
           Write-Host "Installer exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
 
-      - name: Create self-signed test certificate
+      - name: Create temporary package-signing certificate
+        id: signing
         shell: pwsh
         run: |
+          $password = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+          Write-Output "::add-mask::$password"
+
           $cert = New-SelfSignedCertificate -Type Custom `
             -Subject "CN=XboxUwpLauncher" `
             -KeyUsage DigitalSignature `
             -FriendlyName "XboxUwpLauncher Dev" `
             -CertStoreLocation "Cert:\CurrentUser\My" `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddMonths(6) `
             -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
-          $pw = ConvertTo-SecureString -String $env:CERT_PASSWORD -Force -AsPlainText
-          Export-PfxCertificate -Cert $cert -FilePath "$env:RUNNER_TEMP\dev.pfx" -Password $pw | Out-Null
-          Export-Certificate -Cert $cert -FilePath "$env:RUNNER_TEMP\XboxUwpLauncher.cer" | Out-Null
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'XboxUwpLauncher.pfx'
+          $cerPath = Join-Path $env:RUNNER_TEMP 'XboxUwpLauncher.cer'
+          $securePassword = ConvertTo-SecureString -String $password -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $securePassword | Out-Null
+          Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+
+          "pfx=$pfxPath" >> $env:GITHUB_OUTPUT
+          "cer=$cerPath" >> $env:GITHUB_OUTPUT
+          "password=$password" >> $env:GITHUB_OUTPUT
 
       - name: Build and package (APPX, x64, Release)
         shell: pwsh
+        env:
+          CERT_PFX: ${{ steps.signing.outputs.pfx }}
+          CERT_PASSWORD: ${{ steps.signing.outputs.password }}
         run: |
           $errLog = "$env:GITHUB_WORKSPACE\build-errors.log"
           msbuild "$env:PROJECT_DIR\XboxUwpLauncher.sln" /restore `
             /p:Configuration=Release /p:Platform=x64 `
+            /p:GenerateAppxPackageOnBuild=true `
             /p:AppxBundle=Never `
             /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxPackageSigningEnabled=true `
-            /p:PackageCertificateKeyFile="$env:RUNNER_TEMP\dev.pfx" `
+            /p:PackageCertificateKeyFile="$env:CERT_PFX" `
             /p:PackageCertificatePassword="$env:CERT_PASSWORD" `
             /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" `
             "/flp:logfile=$errLog;errorsonly"
@@ -72,11 +89,15 @@ jobs:
 
       - name: Collect output
         shell: pwsh
+        env:
+          APPX_CERTIFICATE: ${{ steps.signing.outputs.cer }}
         run: |
-          Copy-Item "$env:RUNNER_TEMP\XboxUwpLauncher.cer" "$env:GITHUB_WORKSPACE\AppPackages\"
+          Copy-Item $env:APPX_CERTIFICATE "$env:GITHUB_WORKSPACE\AppPackages\"
           Get-ChildItem "$env:GITHUB_WORKSPACE\AppPackages" -Recurse | Select-Object FullName
 
       - uses: actions/upload-artifact@v4
         with:
           name: XboxUwpLauncher-appx
           path: AppPackages/
+          if-no-files-found: error
+          retention-days: 14
